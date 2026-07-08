@@ -1,0 +1,39 @@
+#!/bin/bash
+#SBATCH --partition=gpu          # Changed from short to gpu
+#SBATCH --gpus=1
+#SBATCH --time=8:00:00
+#SBATCH --mem=64G
+#SBATCH -c 8
+#SBATCH --output=/n/scratch/users/x/xiw507/spikesort/output/imec_ap_%j.out
+#SBATCH --error=/n/scratch/users/x/xiw507/spikesort/output/imec_ap_%j.err
+module load conda/miniforge3/24.11.3-0
+source $(conda info --base)/etc/profile.d/conda.sh
+conda activate nf_env
+
+echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset}"
+nvidia-smi
+python3 - <<'PY'
+import torch
+
+print(f"torch.cuda.is_available={torch.cuda.is_available()}")
+print(f"torch.cuda.device_count={torch.cuda.device_count()}")
+if torch.cuda.is_available():
+	print(f"torch.cuda.get_device_name(0)={torch.cuda.get_device_name(0)}")
+else:
+	raise SystemExit("CUDA is not available in this environment; stop here instead of falling back to CPU")
+PY
+
+# Optional overrides when submitting:
+# sbatch --export=ALL,DATA_FOLDER=/path/to/spikeglx,RESULTS_FOLDER=/path/to/results,RUN_NAME=my_label run.slrm
+DATA_FOLDER=${DATA_FOLDER:-/n/scratch/users/x/xiw507/spikesort/spikesort_data/20260626_LGN_exp_g0_imec0}
+RESULTS_FOLDER=${RESULTS_FOLDER:-/n/scratch/users/x/xiw507/spikesort/results}
+
+# Define your default run name here (edit this value if desired).
+# We append the SLURM job ID to keep concurrent runs unique.
+RUN_NAME_BASE=${RUN_NAME_BASE:-20260626_LGN_exp}
+RUN_NAME=${RUN_NAME:-${RUN_NAME_BASE}_job${SLURM_JOB_ID}}
+
+python3 /n/scratch/users/x/xiw507/spikesort/run_kilosort_imec_ap.py \
+	--data-folder "$DATA_FOLDER" \
+	--results-folder "$RESULTS_FOLDER" \
+	--run-name "$RUN_NAME"
